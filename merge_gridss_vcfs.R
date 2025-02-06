@@ -54,23 +54,30 @@ output <- yaml::yaml.load(args$output)
 
       #merge variants with the samme mateID and filter only PASS variants
       if(nrow(file.et)>0){
-        file.et.h <- file.et %>% dplyr::filter(stringr::str_detect(ID, "[0-9]h"))
-        file.et.o <- file.et %>% dplyr::filter(stringr::str_detect(ID, "[0-9]o"))
-        files.et.all <- merge(file.et.o, file.et.h, by="EVENT") %>%
+        file.et.h <- file.et %>%
+          dplyr::filter(stringr::str_detect(ID, "[0-9]h"))
+        file.et.o <- file.et %>%
+          dplyr::filter(stringr::str_detect(ID, "[0-9]o"))
+        files.et.all <- merge(file.et.o, file.et.h, by=c("EVENT", "sample", "run", "genes.interest")) %>%
           dplyr::filter(FILTER.x=="PASS"|FILTER.y=="PASS")
 
       #variants with b are single-breakend (we will store them in a dataframe)
-        file.et.b <- file.et %>% dplyr::filter(stringr::str_detect(ID, "[0-9]b$"), FILTER=="PASS")
+        file.et.b <- file.et %>%
+          dplyr::filter(stringr::str_detect(ID, "[0-9]b$"), FILTER=="PASS")
         files.pass.all <- rbind(files.pass.all, files.et.all)
         files.et.b.all <- rbind(files.et.b.all, file.et.b)
       }
     }
   }
+  same.chrom<- files.pass.all %>% dplyr::filter(CHROM.x==CHROM.y)
+  different.chrom<- files.pass.all %>% dplyr::filter(CHROM.x!=CHROM.y)
+
   #write results
-  merge.dir <- file.path(output, "merge_gridss_vcfs")
+  merge.dir <- file.path(output, paste0(Sys.Date(), "_merge_gridss_vcfs"))
   dir.create(merge.dir)
-  write.table(files.pass.all, file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_two_break.txt")), row.names=FALSE)
-  write.txt(files.et.b.all , file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_one_break.csv")), row.names=FALSE)
+  write.table(same.chrom, file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_two_break_same_chrom.txt")), row.names=FALSE, sep="\t")
+  write.table(different.chrom, file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_two_break_different_chrom.txt")), row.names=FALSE, sep="\t")
+  write.table(files.et.b.all , file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_one_break.txt")), row.names=FALSE, sep="\t")
 
 
 
