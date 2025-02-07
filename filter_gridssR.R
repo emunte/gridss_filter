@@ -30,6 +30,8 @@ option_list <- list(
                        help="path to the bed file", metavar="character"),
   optparse::make_option(c("-f", "--frequency"), type="character", default=10,
                         help="Maximum allowed occurrences before a variant is excluded", metavar="integer"),
+  optparse::make_option(c("-v", "--vaf"), type="integer", default=0.1,
+                        help="Minimum variant allele frequency", metavar="float"),
   optparse::make_option(c("-o", "--output"), type="character", default="",
                         help="Path to the output directory. Results will be stored in this folder", metavar="character")
 )
@@ -41,6 +43,7 @@ input <- yaml::yaml.load(args$txt)
 output <- yaml::yaml.load(args$output)
 bedFile <- yaml::yaml.load(args$bedFile) %>% rtracklayer::import()
 frequency.filter <- yaml::yaml.load(args$filter.frequency)
+vaf <- yaml::yaml.load(args$vaf)
 
 
 # 3. Load data
@@ -51,7 +54,7 @@ all.one.break <- list.files(input, pattern="merge_gridss_one_break.txt", recursi
   dplyr::mutate(end=POS)
 
 
-all.two.break <- list.files(input, pattern="merge_gridss_two_break.txt", recursive=TRUE, full.names=TRUE) %>%
+all.two.break <- list.files(input, pattern="merge_gridss_two_break_same_chrom.txt", recursive=TRUE, full.names=TRUE) %>%
   read.delim(header=TRUE, sep="\t") %>%  #reorder
   dplyr::mutate(
     chrom1=ifelse(POS.y < POS.x, CHROM.y, CHROM.x),
@@ -121,9 +124,118 @@ overlaps.one <- overlaps.gr %>% as.data.frame(row.names=NULL) %>%
   unique()
 
 
-#Two-breaks
+# Two-breaks
+# We try to see if any of the two breakpoints (POS.x or POS.y) is inside the region of interest (ROI)
+# Convert `all.two.break` into two separate GRanges objects for each breakpoint (x and y)
+# Convert the first breakpoint (CHROM.x, POS.x) into a GRanges object
+all.two.break.GR.x <-  all.two.break %>%
+  dplyr::mutate(POS.x2 = POS.x) %>%
+  dplyr::select(CHROM.x, POS.x, POS.x2, EVENT, MATEID.x, MATEID.y, sample) %>%
+  regioneR::toGRanges()
+# Convert the second breakpoint (CHROM.y, POS.y) into a GRanges object
+all.two.break.GR.y <-  all.two.break %>%
+  dplyr::mutate(POS.y2 = POS.y) %>%
+  dplyr::select(CHROM.y, POS.y, POS.y2, EVENT, MATEID.x, MATEID.y, sample) %>%
+  regioneR::toGRanges()
+
+# Find overlaps between the breakpoints and the ROI (bedFile)
+two.b.x <- GenomicRanges::findOverlaps(bedFile, all.two.break.GR.x)
+two.b.y <- GenomicRanges::findOverlaps(bedFile, all.two.break.GR.y)
+# Get the exact overlapping regions
+overlaps.gr.two.x <- GenomicRanges::pintersect(all.two.break.GR.x[subjectHits(two.b.x)],bedFile[queryHits(two.b.x)])
+overlaps.gr.two.y <- GenomicRanges::pintersect(all.two.break.GR.y[subjectHits(two.b.y)],bedFile[queryHits(two.b.y)])
+
+# Extract gene names from `bedFile` and assign them to the overlapping regions
+overlaps.gr.two.x$gene.x <- elementMetadata(bedFile[queryHits(two.b.x)])$name
+overlaps.gr.two.y$gene.y <- elementMetadata(bedFile[queryHits(two.b.y)])$name
+
+# Convert GRanges to data frame and keep only unique entries
+overlaps.two.x <- overlaps.gr.two.x %>%
+  as.data.frame(row.names = 1:length(overlaps.gr.two.x)) %>%
+  unique()
+overlaps.two.y <- overlaps.gr.two.y %>%
+  as.data.frame(row.names = 1:length(overlaps.gr.two.y)) %>%
+  unique()
+
+# Merge results from both breakpoints (x and y) to keep both gene associations
+# We merge by EVENT, MATEID.x, MATEID.y, and sample to maintain variant integrity
+all.events <- merge(overlaps.two.x, overlaps.two.y, by=c("EVENT", "MATEID.x", "MATEID.y", "sample"), all.x=TRUE, all.y=TRUE) %>%
+  dplyr::select(EVENT, MATEID.x, MATEID.y, sample, gene.x, gene.y) %>%
+  unique()
+
+# Merge the event information with additional variant data (`overlaps.two.sam
+overlaps.two<- merge(all.events,  overlaps.two.sample.count , by=c(c("EVENT", "MATEID.x", "MATEID.y", "sample")))
 
 
 
+# B.2) Only consider genes of interest (if you want to analyze all genes, put ALL_BEDFILE in the colunm genes.interest.
 
+# Function to extract gene names from a column containing "ENSTxxx|GENE"
+extract_gene_name <- function(gene_column) {
+  stringr::str_extract(gene_column, "(?<=\\|)[^|]+")  # Agafa el text després de "|"
+}
+# Function to filter events based on genes of interest  # Extract gene names from `gene.x` and `gene.y` columns
+filter_genes_of_interest <- function(df) {
+  if ("gene.x" %in% colnames(df) & "gene.y" %in% colnames(df)) {
+    # Two-breakend case: Extract gene names from `gene.x` and `gene.y`
+    df <- df %>%
+      mutate(
+        gene.x.name = extract_gene_name(gene.x),
+        gene.y.name = extract_gene_name(gene.y)
+      )
+  } else if ("gene" %in% colnames(df)) {
+    # One-breakend case: Extract gene name from `gene`
+    df <- df %>%
+      mutate(gene.name = extract_gene_name(gene))
+  } else {
+    stop("Error: No gene columns found (expected 'gene.x' and 'gene.y' for two breakends or 'gene' for one breakend).")
+  }
+
+  # Filter data independently for each sample
+  df.filtered <- df %>%
+    group_by(sample) %>%  # Group by sample to apply different filters per sample
+    filter(
+      unique(genes.interest) == "ALL_BEDFILE" |
+        any(across(any_of(c("gene.x.name", "gene.y.name", "gene.name")),
+                                                            ~ . %in% unlist(strsplit(unique(genes.interest), ",\\s*"))
+      ))
+    ) %>%
+    ungroup()  # Remove grouping
+  return(df.filtered)  # Return the filtered dataset
+}
+
+ov.one.cascade <- filter_genes_of_interest(overlaps.one)
+ov.two.cascade <- filter_genes_of_interest(overlaps.two)
+
+filters.variants <- filters.variants %>%
+  dplyr::mutate(phenotype=c(nrow(ov.one.cascade), nrow(ov.two.cascade)))
+
+#C) Filter by gt_AF ----
+AF.one <- ov.one.cascade %>%
+  dplyr::filter(gt_AF >= vaf)
+
+AF.two <- ov.two.cascade %>%
+  dplyr::filter(gt_AF.x >= vaf &
+                  gt_AF.y >= vaf)
+
+filters.variants <- filters.variants %>%
+  dplyr::mutate(gt_AF=c(nrow(AF.one), nrow(AF.two)))
+
+
+#D) Delete variants in repetitive regions
+ov.one.no.repeats <- AF.one %>%
+  dplyr::filter(!(INSRMRC %in% c("Low_complexity", "Simple_repeat") ))
+ov.two.no.repeats <- AF.two %>%
+  dplyr::filter(!(INSRMRC.x %in% c("Low_complexity", "Simple_repeat") & INSRMRC.y %in% c("Low_complexity", "Simple_repeat") ))
+
+filters.variants <- filters.variants %>%
+  dplyr::mutate(gt_AF=c(nrow(ov.one.no.repeats), nrow(ov.two.no.repeats)))
+
+#E) Delete highly similar variants (CHR, POS)
+
+ov.one.hot.spot <- ov.one.no.repeats %>%
+  dplyr::filter(n2<=highly.similar)
+
+ov.two.hot.spot <- ov.two.no.repeats %>%
+  dplyr::filter(n2<=highly.similar)
 
