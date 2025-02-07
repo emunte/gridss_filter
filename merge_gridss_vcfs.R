@@ -69,14 +69,11 @@ output <- yaml::yaml.load(args$output)
       }
     }
   }
-  same.chrom<- files.pass.all %>% dplyr::filter(CHROM.x==CHROM.y)
-  different.chrom<- files.pass.all %>% dplyr::filter(CHROM.x!=CHROM.y)
 
   #write results
   merge.dir <- file.path(output, paste0(Sys.Date(), "_merge_gridss_vcfs"))
   dir.create(merge.dir)
-  write.table(same.chrom, file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_two_break_same_chrom.txt")), row.names=FALSE, sep="\t")
-  write.table(different.chrom, file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_two_break_different_chrom.txt")), row.names=FALSE, sep="\t")
+  write.table(files.pass.all, file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_two_break.txt")), row.names=FALSE, sep="\t")
   write.table(files.et.b.all , file.path(merge.dir, paste0(Sys.Date(), "merge_gridss_one_break.txt")), row.names=FALSE, sep="\t")
 
 
