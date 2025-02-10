@@ -14,7 +14,8 @@ install_if_missing <- function(pkg) {
 }
 
 #List of libraries
-packages <- c("dplyr", "optparse", "stringr", "GenomicRanges", "yaml")
+packages <- c("dplyr", "optparse", "stringr", "GenomicRanges", "yaml", "DiagrammeR", "DiagrammeRsvg", "rsvg")
+
 
 #Apply
 invisible(sapply(packages, install_if_missing))
@@ -28,10 +29,8 @@ option_list <- list(
                         help="Folder with merge results", metavar="character"),
   optparse::make_option(c("-d", "--bedFile"), type="character", default="",
                        help="path to the bed file", metavar="character"),
-  optparse::make_option(c("-f", "--frequency"), type="character", default=10,
-                        help="Maximum allowed occurrences before a variant is excluded", metavar="integer"),
-  optparse::make_option(c("-v", "--vaf"), type="integer", default=0.1,
-                        help="Minimum variant allele frequency", metavar="float"),
+  optparse::make_option(c("-p", "--params"), type="character", default="params.yaml",
+                        help="Yaml file with all the specifications", metavar="integer"),
   optparse::make_option(c("-o", "--output"), type="character", default="",
                         help="Path to the output directory. Results will be stored in this folder", metavar="character")
 )
@@ -39,11 +38,11 @@ option_list <- list(
 opt_parser <- optparse::OptionParser(option_list=option_list);
 # Load params
 args <- optparse::parse_args(opt_parser)
-input <- yaml::yaml.load(args$txt)
-output <- yaml::yaml.load(args$output)
-bedFile <- yaml::yaml.load(args$bedFile) %>% rtracklayer::import()
-frequency.filter <- yaml::yaml.load(args$filter.frequency)
-vaf <- yaml::yaml.load(args$vaf)
+input <- args$txt
+output <- args$output
+bedFile <- args$bedFile %>% rtracklayer::import()
+params <- yaml::yaml.load(args$params)
+
 
 
 # 3. Load data
@@ -86,7 +85,7 @@ overlaps.one.sample.count <- all.one.break %>%  #merge results
   dplyr::left_join(count.obs, by=c("CHROM", "POS", "ALT"))%>%
   dplyr::mutate(start = POS) %>%
   dplyr::filter(n <= frequency.filter) %>% #filter
-  dplyr::relocate(run, sample, genes.interest, CHROM, start, end, .before = POS)
+  dplyr::relocate(CHROM, start, end, run, sample, genes.interest, .before = POS)
 
 #two-breaks
 count.obs.two <- all.two.break %>%
@@ -212,11 +211,11 @@ filters.variants <- filters.variants %>%
 
 #C) Filter by gt_AF ----
 AF.one <- ov.one.cascade %>%
-  dplyr::filter(gt_AF >= vaf)
+  dplyr::filter(gt_AF >= args$gt_AF)
 
 AF.two <- ov.two.cascade %>%
-  dplyr::filter(gt_AF.x >= vaf &
-                  gt_AF.y >= vaf)
+  dplyr::filter(gt_AF.x >= args$gt_AF &
+                  gt_AF.y >= args$gt_AF)
 
 filters.variants <- filters.variants %>%
   dplyr::mutate(gt_AF=c(nrow(AF.one), nrow(AF.two)))
@@ -229,13 +228,119 @@ ov.two.no.repeats <- AF.two %>%
   dplyr::filter(!(INSRMRC.x %in% c("Low_complexity", "Simple_repeat") & INSRMRC.y %in% c("Low_complexity", "Simple_repeat") ))
 
 filters.variants <- filters.variants %>%
-  dplyr::mutate(gt_AF=c(nrow(ov.one.no.repeats), nrow(ov.two.no.repeats)))
+  dplyr::mutate(simple=c(nrow(ov.one.no.repeats), nrow(ov.two.no.repeats)))
 
 #E) Delete highly similar variants (CHR, POS)
-
 ov.one.hot.spot <- ov.one.no.repeats %>%
   dplyr::filter(n2<=highly.similar)
 
 ov.two.hot.spot <- ov.two.no.repeats %>%
   dplyr::filter(n2<=highly.similar)
+
+filters.variants <- filters.variants %>%
+  dplyr::mutate(similar=c(nrow(ov.one.hot.spot), nrow(ov.two.hot.spot)))
+
+
+# F) For one break get only MEI variants
+one.b.definitive <- ov.one.hot.spot %>%
+  dplyr::filter(INSRMRC %in% c("SINE", "LINE"))
+
+#E) For two breakends only consider variants that are bigger than X (if located at the same chr)
+
+count_ATCG <- function(seq_vector) {
+  extracted <- str_extract_all(seq_vector, "[ATCG]+")  # Extreu només A, T, C, G
+  lengths <- sapply(extracted, nchar)  # Compta quants nucleòtids hi ha en cada entrada
+  return(lengths)
+}
+two.b.definitive <- ov.two.hot.spot %>%
+  dplyr::filter(CHROM.x!=CHROM.y | CHROM.x==CHROM.y & (end-start >= minimumLength | (end-start ==1 & count_ATCG(ALT.x) >= minimumLegth)))
+
+
+
+#Plot diagram
+workflow_filtering <- function(what, filters, one.def, two.def){
+wf<- grViz(paste("
+digraph flow {
+  graph [layout = dot, rankdir = TB]
+
+  node [shape = rectangle, style = filled, fillcolor = white, fontname = Helvetica, fontsize = 12]
+
+  # Nodes
+  Total_Variants [label = 'Total", what, "breakend", filters.variants$totals," variants', shape = box, style = filled, fillcolor = lightgrey]
+
+  Filter1 [label = 'Present in \n ≤", args$frequency, "samples?', shape = diamond, fillcolor = white]
+  Pass1 [label ='",  filters.variants$nsample,"variants', fillcolor = lightblue]
+  Fail1 [label = '", filters.variants$totals-filters.variants$totals, "variants', fillcolor = lightcoral]
+
+  Filter2 [label = 'Phenotype genes?', shape = diamond, fillcolor = white]
+  Pass2 [label = '",  filters.variants$phenotype,"variants', fillcolor = lightblue]
+  Fail2 [label = '",  filters.variants$nsample-filters.variants$phenotype," variants', fillcolor = lightcoral]
+
+  Filter3 [label = 'VAF ≥", args$gt_AF, "', shape = diamond, fillcolor = white]
+  Pass3 [label = '",  filters.variants$gt_AF,"variants', fillcolor = lightblue]
+  Fail3 [label = '",  filters.variants$phenotype- filters.variants$gt_AF,"variants', fillcolor = lightcoral]
+
+  Filter4 [label = 'outside a simple \n repeat  or low \n complexity region', shape = diamond, fillcolor = white]
+  Pass4 [label = '",  filters.variants$simple,"variants', fillcolor = lightblue]
+  Fail4 [label = '",  filters.variants$gt_AF- filters.variants$simple,"variants', fillcolor = lightcoral]
+
+  Filter5 [label = 'highly similar \n variant ≤", args$similar, " ', shape = diamond, fillcolor = white]
+  Pass5 [label = '",  filters.variants$similar, "variants', fillcolor = lightblue]
+  Fail5 [label = '",  filters.variants$simple- filters.variants$similar,"variants', fillcolor = lightcoral]",
+
+  if(what=="one"){
+    paste("Filter6 [label = 'Transposable \n elements', shape = diamond, fillcolor = white]
+    Pass6 [label = '",  nrow(one.b.definitive),"variants', fillcolor = lightblue]
+    Fail6 [label = '",  filters.variants$similar- nrow(one.b.definitive),"variants', fillcolor = lightcoral]")
+  }else{
+    paste("Filter6 [label = 'minimum length \n ≥", args$minimumLength, "bp', shape = diamond, fillcolor = white]
+    Pass6 [label = '",  nrow(two.b.definitive),"variants', fillcolor = lightblue]
+    Fail6 [label = '",  filters.variants$similar- nrow(two.b.definitive),"variants', fillcolor = lightcoral]")
+  },
+  "
+  # Edges
+  Total_Variants -> Filter1
+  Filter1 -> Pass1 [label = 'Yes']
+  Filter1 -> Fail1 [label = 'No']
+
+  Pass1 -> Filter2
+  Filter2 -> Pass2 [label = 'Yes']
+  Filter2 -> Fail2 [label = 'No']
+
+  Pass2 -> Filter3
+  Filter3 -> Pass3 [label = 'Yes']
+  Filter3 -> Fail3 [label = 'No']
+
+  Pass3 -> Filter4
+  Filter4 -> Pass4 [label = 'Yes']
+  Filter4 -> Fail4 [label = 'No']
+
+  Pass4 -> Filter5
+  Filter5 -> Pass5 [label = 'Yes']
+  Filter5 -> Fail5 [label = 'No']
+
+  Pass5 -> Filter6
+  Filter6 -> Pass6 [label = 'Yes']
+  Filter6 -> Fail6 [label = 'No']
+}"))
+return(wf)
+}
+
+plots.dir <- file.path(args$output, "plots")
+dir.create(plots.dir)
+one.wf <- workflow_filtering("one", filters.variants[1,], one.b.definitive, two.b.definitive)
+two.wf <- workflow_filtering("two", filters.variants[2,], one.b.definitive, two.b.definitive)
+
+
+# convert to SVG
+svg.one <- DiagrammeRsvg::export_svg(one.wf)
+svg.two <- DiagrammeRsvg::export_svg(two.wf)
+
+# Save as PNG
+rsvg_png(charToRaw(svg.one), file = file.path(plots.dir, "workflow_diagram_one.png"))
+rsvg_png(charToRaw(svg.two), file = file.path(plots.dir, "workflow_diagram_two.png"))
+
+
+
+
 
