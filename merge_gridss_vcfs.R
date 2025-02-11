@@ -29,8 +29,8 @@ option_list <- list(
 opt_parser <- optparse::OptionParser(option_list=option_list);
 # Load params
 args <- optparse::parse_args(opt_parser)
-samples.txt <- yaml::yaml.load(args$txt)
-output <- yaml::yaml.load(args$output)
+samples.txt <- args$txt
+output <- args$output
 
 # 3. Pipeline
 
