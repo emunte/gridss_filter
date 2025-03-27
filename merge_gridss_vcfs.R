@@ -57,7 +57,7 @@ process_vcf <- function(i, samples.df){
     colnames(vcf.tidy$dat) <- gsub("^REF...61", "REF_num", colnames(vcf.tidy$dat)) #avoid repeated names
     colnames(vcf.tidy$dat) <- gsub("^REF...4", "REF", colnames(vcf.tidy$dat))
     #colnames(vcf.tidy$dat) <- make.unique(colnames(vcf.tidy$dat))
-    
+
     file.et <- as.data.frame(vcf.tidy$dat) %>%
       mutate(sample = samples.df$sample[i],
              run = samples.df$run[i],
@@ -68,12 +68,18 @@ process_vcf <- function(i, samples.df){
       file.et.o <- file.et %>% filter(str_detect(ID, "[0-9]o"))
 
       files.et.all <- merge(file.et.o, file.et.h, by = c("EVENT", "sample", "run", "genes.interest")) %>% #merge two breakend variants
-        filter(FILTER.x == "PASS" | FILTER.y == "PASS")
+        dplyr::filter(FILTER.x == "PASS" | FILTER.y == "PASS")
 
       file.et.b <- file.et %>%
-        filter(str_detect(ID, "[0-9]b$"), FILTER == "PASS")  #one breakend variants
+        dplyr::filter(str_detect(ID, "[0-9]b$"), FILTER == "PASS")  #one breakend variants
+
+      #Count how many variants has this sample (all variants, ans variants FILTER==PASS)
+      variants.total <- sum(file.et.h %>% nrow(), file.et %>% dplyr::filter(str_detect(ID, "[0-9]b$")) %>% nrow())
+      variants.pass <- sum(files.et.all %>% nrow(), file.et.b %>% nrow())
+
       gc()
-      return(list(two_breaks = files.et.all, one_breaks = file.et.b))
+      return(list(two_breaks = files.et.all %>% dplyr::mutate(number_variants_sample= variants.total, variants.pass=variants.pass),
+                  one_breaks = file.et.b %>% dplyr::mutate(number_variants_sample_pass= variants.total, variants.pass=variants.pass)))
     }
   }
   gc()
@@ -85,22 +91,22 @@ process_vcf <- function(i, samples.df){
 # 5 Run the pipeline----
 
 #read the txt file
-samples.df <- read.delim(samples.txt) 
+samples.df <- read.delim(samples.txt)
 
 #Execute the function
 results <- furrr::future_map(1:nrow(samples.df), process_vcf, samples.df, .progress = TRUE, .options = furrr_options(seed = TRUE))
 
 # Stop parallelization
-future::plan(sequential)  
+future::plan(sequential)
 #Save memory
-gc() 
+gc()
 
 #bind the results
 files.pass.all <- bind_rows(lapply(results, `[[`, "two_breaks"))
 files.et.b.all <- bind_rows(lapply(results, `[[`, "one_breaks"))
 
 #Create the otuput dir
-merge.dir <- file.path(output, paste0(Sys.Date(), "_merge_gridss_vcfs"))
+merge.dir <- file.path(output, "merge_gridss_vcfs")
 dir.create(merge.dir, showWarnings = FALSE)
 
 #print the results in txt files
