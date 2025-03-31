@@ -24,8 +24,8 @@ This script reads all VCFs annotated with gridss_annotate_vcf_repeatmasker and e
 - Variants with a single breakend
 - Variants with two breakends, merged by ID and MATEID
 
- ````
-Rscript merge_gridss_vcfs.R --txt <paths_vcfs.txt> --output <path_folder_output> [--cores n]
+````r
+Rscript merge_gridss_vcfs.R --txt <paths_vcfs.txt> --output <output_folder> [--cores N]
 ```` 
 
 --txt (-t):
