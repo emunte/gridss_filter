@@ -14,7 +14,7 @@ Input BAM files must be processed with GRIDSS and annotated using `gridss_annota
 
 All required R packages will be automatically installed if missing:
 
-```r
+```
 packages <- c("dplyr", "optparse", "stringr", "vcfR", "GenomicRanges", "yaml", "furrr")
 ````
 
