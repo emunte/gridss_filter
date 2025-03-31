@@ -39,7 +39,7 @@ Path to a tab-delimited text file containing VCF paths and sample metadata. The 
 | path_sample2_vcf_repeatmasker.vcf | sample2  | run1  | gene1, gene3, gene5|
 
 - `sample(n)` should match the exact sample name
--genes.interest should list comma-separated gene names
+- genes.interest should list comma-separated gene names
 
 ##### `--output` (`-o`):
 Path to the output folder where result files will be stored.
