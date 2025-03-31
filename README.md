@@ -44,10 +44,11 @@ Path to a tab-delimited text file containing VCF paths and sample metadata. The 
 
 | path  | sample | run | genes.interest |
 |-----------|-----------|-----------|-----------|
-| path_sample1_vcf_repeatmasker.vcf | sample1  | run1  | gene1, gene2, gene3, gene4|
-| path_sample2_vcf_repeatmasker.vcf | sample2  | run1  | gene1, gene3, gene5|
+| /path/to/sample1_vcf_repeatmasker.vcf | sample1  | run1  | gene1, gene2, gene3, gene4|
+| /path/to/sample2_vcf_repeatmasker.vcf | sample2  | run1  | gene1, gene3, gene5|
+| /path/to/sampleN_vcf_repeatmasker.vcf| sampleN  | runX  | geneY|
 
-- `sample(n)` should match the exact sample name
+- `sample(N)` should match the exact sample name
 - `genes.interest` should list comma-separated gene names
 
 ##### `--output` (`-o`):
