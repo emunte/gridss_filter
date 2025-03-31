@@ -2,9 +2,13 @@
 **gridss_filter** is a framework designed to assist in the prioritization of germline structural variants called by the [GRIDSS](https://github.com/PapenfussLab/gridss) software.
 
 ## Prerequisites 
-- GRIDSS v2.13.2  
-- RepeatMasker v4.1.5  
-- R v4.4.2  
+This pipeline has been developed using the following software versions:
+
+- **GRIDSS v2.13.2** and **RepeatMasker v4.1.5** were used to generate and annotate the input VCF files.  
+  ⚠️ If your input data comes from different versions, output formats may differ and could require adjustments.
+  
+- **R v4.4.2**: used to develop and run all the scripts in this repository.  
+  You will need this version (or a compatible one) to execute the filtering and processing steps.
 - R packages required (they will be installed while running the scripts if missing):  
   - CRAN packages: `assertthat`, `DiagrammeR`, `DiagrammeRsvg`, `dplyr`, `optparse`, `rsvg`, `stringr`, `yaml`  
   - Bioconductor packages: `GenomicRanges`
