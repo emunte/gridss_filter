@@ -28,9 +28,9 @@ This script reads all VCFs annotated with `gridss_annotate_vcf_repeatmasker` and
 Rscript merge_gridss_vcfs.R --txt <paths_vcfs.txt> --output <output_folder> [--cores N]
 ````
 
-## Arguments
+#### Arguments
 
-### `--txt` (`-t`)
+##### `--txt` (`-t`)
 Path to a tab-delimited text file containing VCF paths and sample metadata. The file must have the following format:
 
 | path  | sample | run | genes.interest |
@@ -41,11 +41,11 @@ Path to a tab-delimited text file containing VCF paths and sample metadata. The 
 - `sample(n)` should match the exact sample name
 -genes.interest should list comma-separated gene names
 
---output (-o):
+##### `--output` (`-o`):
 Path to the output folder where result files will be stored.
 
 
---cores (-c):
+##### `--cores` (`-c`):
 The number of cores to use. 
 
 
