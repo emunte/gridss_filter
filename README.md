@@ -16,3 +16,10 @@ Your bams of interest must be analyzed using gridss and annotated using gridss_a
  ````
 Rscript merge_gridss_vcfs.R --txt <paths_vcfs.txt> --output <path_folder_output> [--cores n]
 ```` 
+
+path	sample	run	genes.interest
+
+| path  | sample | run | genes.interest |
+|-----------|-----------|-----------|-----------|
+| path_sample1_vcf_repeatmasker.vcf | sample1  | run 1  | gene1, gene2, gene3, gene4|
+| path_sample2_vcf_repeatmasker.vcf | sample2  | run 1  | gene1, gene3, gene5, gene6|
