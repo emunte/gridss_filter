@@ -11,8 +11,14 @@ Input BAM files must be processed with GRIDSS and annotated using `gridss_annota
 ---
 
 ## Installation
+To get started, clone this repository:
 
-All required R packages will be automatically installed if missing:
+```bash
+git clone https://github.com/emunte/gridss_filter.git
+cd gridss_filter
+````
+
+When running the scripts all required R packages will be automatically installed if missing:
 
 ```r
 packages <- c("dplyr", "optparse", "stringr", "vcfR", "GenomicRanges", "yaml", "furrr")
