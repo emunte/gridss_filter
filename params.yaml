@@ -1,4 +1,4 @@
-frequency: 10 #Maximum allowed occurrences before a variant is excluded
+frequency: 10 #Number of occurrences at which the variant is excluded (CHROM; POS & ALT)
 gt_AF: 0.1 #Minimum variant allele frequency (not in %)
-similar: 10 #
-minimumLength: 20 #for two breakends located at the same chrom, only consider SV bigger than this.
+similar: 15 #Number of occurrences at which the variant is excluded (CHROM;POS)
+minimumLength: 21 #for two breakends located at the same chrom, only consider SV bigger than this.
