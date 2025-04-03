@@ -314,7 +314,7 @@ digraph flow {
   Pass4 [label = '",  filters$simple,"variants', fillcolor = lightblue]
   Fail4 [label = '",  filters$gt.AF- filters$simple,"variants', fillcolor = lightcoral]
 
-  Filter5 [label = 'highly similar \n variant ≤", highly.similar, " ', shape = diamond, fillcolor = white]
+  Filter5 [label = 'highly similar \n variant <", highly.similar, " ', shape = diamond, fillcolor = white]
   Pass5 [label = '",  filters$similar, "variants', fillcolor = lightblue]
   Fail5 [label = '",  filters$simple- filters$similar,"variants', fillcolor = lightcoral]",
 
@@ -364,8 +364,8 @@ svg.one <- DiagrammeRsvg::export_svg(one.wf)
 svg.two <- DiagrammeRsvg::export_svg(two.wf)
 
 # Save as PNG
-rsvg_png(charToRaw(svg.one), file = file.path(plots.dir, paste(Sys.Date(), name, "workflow_diagram_one.png", sep = "_")))
-rsvg_png(charToRaw(svg.two), file = file.path(plots.dir, paste(Sys.Date(), name, "workflow_diagram_two.png", sep = "_")))
+rsvg_png(charToRaw(svg.one), file = file.path(plots.dir, paste(Sys.Date(), name, "workflow_diagram_one.png", sep = "_")), width=810, height=1800)
+rsvg_png(charToRaw(svg.two), file = file.path(plots.dir, paste(Sys.Date(), name, "workflow_diagram_two.png", sep = "_")),width=810, height=1800)
 
 
 
